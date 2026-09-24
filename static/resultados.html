@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resultados — RefinaPaleo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="logo" href="/">
+        <span class="logo-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>
+          </svg>
+        </span>
+        <span>
+          <span class="logo-name">RefinaPaleo</span>
+          <div class="logo-sub">Resultados do refinamento</div>
+        </span>
+      </a>
+      <span class="spacer"></span>
+      <nav><a href="/">← Novo processamento</a></nav>
+    </div>
+  </header>
+
+  <main class="wrap" id="app">
+    <div class="skeleton" id="loading">Carregando resultados do job…</div>
+    <div class="error-box" id="error-box" style="margin-top:24px;"></div>
+
+    <div id="content" hidden>
+      <!-- barra superior -->
+      <section class="toolbar">
+        <h1>Mapas refinados</h1>
+        <span class="file-chip" id="chip-file"></span>
+        <span class="file-chip" id="chip-px"></span>
+        <div class="actions">
+          <a class="btn btn-ghost btn-small" href="/" style="text-decoration:none;">← Novo mapa</a>
+          <a class="btn btn-primary btn-small" id="btn-zip" style="text-decoration:none;">⬇ Baixar lote completo (.zip)</a>
+        </div>
+      </section>
+
+      <!-- banner de conferência global -->
+      <section class="summary-banner" id="summary">
+        <div>
+          <div class="big">✅ Conferência de confiabilidade aprovada</div>
+          <div class="sub">Camadas vetoriais geográficas e pontos observacionais restaurados bit a bit — verificação por correlação cruzada e diferença absoluta.</div>
+        </div>
+        <span class="spacer"></span>
+        <div class="stat"><b id="st-vers">—</b><span>versões geradas</span></div>
+        <div class="stat"><b id="st-err">0 px</b><span>erro vetorial máx.</span></div>
+        <div class="stat"><b id="st-shift">0 px</b><span>deslocamento medido</span></div>
+        <div class="stat"><b id="st-chg">—</b><span>mudança máx. nas zonas</span></div>
+      </section>
+
+      <!-- mapa original -->
+      <section class="section">
+        <div class="section-head">
+          <span class="kicker">Entrada</span>
+          <h2>Mapa original (PDF vetorizado)</h2>
+          <p>Referência para a conferência de confiabilidade. As camadas identificadas no desacoplamento são indicadas abaixo.</p>
+        </div>
+        <div class="orig-grid">
+          <div class="orig-frame"><img id="orig-img" alt="Mapa original"></div>
+          <div class="card orig-meta">
+            <h3>Camadas desacopladas</h3>
+            <dl class="kv" id="layers-kv"></dl>
+            <div class="chips" id="orig-chips"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- tecnologias -->
+      <section class="section" id="tech-section">
+        <div class="section-head">
+          <span class="kicker">Saída · 3 tecnologias × 3 intensidades</span>
+          <h2>Mapas refinados</h2>
+          <p>Clique em um cartão para abrir o comparativo (original · refinado · mapa de alteração) e baixar em TIFF ou PNG.</p>
+        </div>
+        <div id="tech-list"></div>
+      </section>
+
+      <!-- tabela de confiabilidade -->
+      <section class="section" id="confiabilidade">
+        <div class="section-head">
+          <span class="kicker">Avaliação científica</span>
+          <h2>Tabela de confiabilidade frente ao mapa de entrada</h2>
+          <p>Cada versão é comparada ao PDF original rasterizado: mudança estética nas zonas climáticas (ΔE CIE76 &gt; 3) e erro posicional nas camadas protegidas.</p>
+        </div>
+        <div class="card table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Tecnologia</th>
+                <th>Intensidade</th>
+                <th>Parâmetros aplicados</th>
+                <th class="num">Mudança nas zonas %</th>
+                <th class="num">Erro vetorial (px)</th>
+                <th class="num">Erro observacional (px)</th>
+                <th class="num">Deslocamento (px)</th>
+                <th class="num">PSNR (dB)</th>
+                <th class="num">SSIM</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-body"></tbody>
+          </table>
+          <div class="table-foot">
+            <strong>Legenda:</strong> Mudança nas zonas = fração de pixels de zona com ΔE (CIE76) acima do limiar perceptível (confinada às fronteiras).
+            Erro vetorial/observacional = diferença máxima de pixel nas camadas geográficas e nos pontos amostrais (0 = idênticos bit a bit).
+            Deslocamento = correlação cruzada das camadas protegidas. PSNR/SSIM = similaridade global da imagem.
+          </div>
+        </div>
+      </section>
+
+      <!-- metodologia -->
+      <section class="section" id="metodologia">
+        <details class="method" open>
+          <summary>Metodologia e rigor científico da conferência</summary>
+          <div class="body">
+            <h4>1 · Carregamento e desacoplamento</h4>
+            O PDF é rasterizado e cada primitiva vetorial é classificada por inspeção de <code>get_drawings</code>:
+            preenchimentos grandes → <strong>zonas climáticas</strong> (região elegível ao refinamento);
+            traços finos (costa, graticule, molduras) e caixas de texto → <strong>camadas geográficas/textuais protegidas</strong>;
+            preenchimentos pequenos com contorno → <strong>pontos observacionais</strong>. A área climática é convertida
+            para o espaço de cor <strong>CIELAB</strong>, adequado a operações sem perda perceptível de dados.
+            <h4>2/3 · Suavização e realce com geometria intocável</h4>
+            As três tecnologias operam somente dentro de uma faixa estreita ao redor das fronteiras entre zonas
+            (<code>faixa de fronteira</code>), excluída uma margem de segurança ao redor das camadas protegidas.
+            Ao final, os pixels protegidos são <strong>restaurados bit a bit</strong> — portanto a posição de costas,
+            graticules, molduras, textos e pontos amostrais é idêntica ao original por construção.
+            Nenhuma etapa interpola, desloca ou reamostra coordenadas dos polígonos originais.
+            <h4>4 · Versões para seleção</h4>
+            Cada tecnologia é executada em três intensidades (Mínima, Intermediária, Intensa), variando
+            progressivamente os parâmetros estéticos (raios morfológicos, σ do filtro bilateral, κ e iterações
+            da difusão), oferecendo opções ao Paleoclimate Change Visualization System.
+            <h4>5 · Conferência de confiabilidade</h4>
+            <strong>% de mudança das zonas</strong>: pixels de zona com ΔE (CIE76) &gt; 3 (limiar perceptível).
+            <strong>Erro vetorial/observacional</strong>: diferença máxima de pixel nas máscaras protegidas (garantida 0).
+            <strong>Deslocamento</strong>: correlação cruzada normalizada de um recorte das camadas protegidas.
+            <strong>PSNR/SSIM</strong>: similaridade global. Os valores são exibidos por versão na tabela acima
+            e embutidos nos metadados TIFF (<code>ImageDescription</code>).
+            <h4>6 · Exportação</h4>
+            Saída estritamente em <strong>TIFF</strong> (compressão Adobe/deflate, resolução embutida, metadados científicos)
+            e <strong>PNG</strong> com DPI preservado.
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>RefinaPaleo · Plataforma de Refinamento de Dados Paleoclimáticos</span>
+      <span>Entrada PDF vetorizado · Saída TIFF/PNG · Geometria intocável</span>
+    </div>
+  </footer>
+
+  <!-- modal de comparativo -->
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modal-title">Comparativo</h3>
+        <button class="x" id="modal-close" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <img class="sheet" id="modal-img" alt="Folha de comparativo">
+        <div class="modal-metrics" id="modal-metrics"></div>
+        <div class="modal-actions" id="modal-actions"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/static/js/resultados.js"></script>
+</body>
+</html>

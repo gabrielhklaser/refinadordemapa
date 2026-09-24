@@ -1,0 +1,8 @@
+# Artefatos gerados em runtime (jobs de processamento)
+data/
+sample_paleomap.pdf
+
+# Python
+__pycache__/
+*.pyc
+.venv/

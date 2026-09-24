@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RefinaPaleo — Refinamento de Mapas Paleoclimáticos</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="logo" href="/">
+        <span class="logo-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>
+          </svg>
+        </span>
+        <span>
+          <span class="logo-name">RefinaPaleo</span>
+          <div class="logo-sub">Refinamento de Dados Paleoclimáticos</div>
+        </span>
+      </a>
+      <span class="spacer"></span>
+      <nav>
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#metodologia">Metodologia</a>
+      </nav>
+      <span class="pill">SKILL v1.0</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Refinamento visual de mapas paleoclimáticos<br>sem alterar a geometria geográfica</h1>
+      <p class="sub">
+        Envie um <strong>PDF vetorizado</strong> com seu mapa paleoclimático. A plataforma desacopla
+        as camadas vetoriais (pontos de amostragem, linhas de costa, limites geográficos) da região
+        climática, aplica <strong>3 tecnologias distintas</strong> de suavização morfológica e realce e
+        devolve <strong>3 arquivos por metodologia</strong> — prontos para download em
+        <strong>TIFF</strong> ou <strong>PNG</strong> — com tabela de confiabilidade frente ao mapa original.
+      </p>
+    </section>
+
+    <section class="card upload-card" id="upload-card">
+      <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Selecionar PDF">
+        <div class="dz-icon">🗺️</div>
+        <div class="dz-title">Arraste seu PDF vetorizado aqui</div>
+        <div class="dz-hint">ou clique para selecionar · mapa paleoclimático em formato PDF (vetorial)</div>
+        <div class="dz-file" id="dz-file">📄 <span id="dz-file-name"></span></div>
+      </div>
+      <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="dpi">Resolução de rasterização</label>
+          <select id="dpi">
+            <option value="100">Rápida — 100 dpi (pré-visualização)</option>
+            <option value="120" selected>Padrão — 120 dpi (recomendado)</option>
+            <option value="150">Alta — 150 dpi</option>
+            <option value="200">Máxima — 200 dpi (mais lento)</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost" id="btn-sample" type="button">🧪 Usar mapa de exemplo</button>
+          <button class="btn btn-primary" id="btn-process" type="button" disabled>⚙️ Refinar mapa</button>
+        </div>
+      </div>
+
+      <div class="note">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        <span>
+          <strong>Garantias científicas:</strong> as camadas vetoriais (costa, graticule, molduras),
+          textos e pontos observacionais são isolados e restaurados <em>bit a bit</em> — erro posicional
+          de 0&nbsp;px em todas as versões. O refinamento atua exclusivamente nas fronteiras entre zonas
+          climáticas, e cada versão recebe uma conferência de confiabilidade (% de mudança de zonas).
+        </span>
+      </div>
+    </section>
+
+    <section class="card progress-card" id="progress-card" aria-live="polite">
+      <div class="progress-top">
+        <div class="spinner"></div>
+        <span class="progress-msg" id="progress-msg">Inicializando pipeline…</span>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+      <div class="bar"><i id="progress-bar"></i></div>
+      <div class="progress-sub" id="progress-sub">
+        Pipeline: desacoplamento de camadas → suavização (3 tecnologias × 3 intensidades) →
+        realce → conferência de confiabilidade → exportação TIFF/PNG.
+      </div>
+    </section>
+
+    <section class="error-box" id="error-box"></section>
+
+    <section class="steps" id="como-funciona">
+      <div class="step"><div class="num">1</div><h3>Carregamento &amp; desacoplamento</h3><p>O PDF é rasterizado e as camadas vetoriais (pontos, costa, limites) são isoladas da área climática, convertida para o espaço CIELAB.</p></div>
+      <div class="step"><div class="num">2</div><h3>Suavização morfológica</h3><p>Filtros de abertura/fechamento e denoising eliminam descontinuidades nos limites dos polígonos — com precisão de borda preservada.</p></div>
+      <div class="step"><div class="num">3</div><h3>Realce com rigor científico</h3><p>Transições suaves entre zonas climáticas, sem deslocar, interpolar ou reposicionar geometrias originais.</p></div>
+      <div class="step"><div class="num">4</div><h3>3 versões por tecnologia</h3><p>Cada metodologia é aplicada em intensidade Mínima, Intermediária e Intensa, gerando opções para o sistema de visualização.</p></div>
+      <div class="step"><div class="num">5</div><h3>Conferência de confiabilidade</h3><p>% de mudança das zonas, correlação cruzada das camadas protegidas e erro métrico de 0&nbsp;px nos dados observacionais.</p></div>
+      <div class="step"><div class="num">6</div><h3>Exportação TIFF/PNG</h3><p>Recombinação das camadas e geração dos arquivos finais com metadados científicos embutidos.</p></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>RefinaPaleo · Plataforma de Refinamento de Dados Paleoclimáticos</span>
+      <span>Processamento local · entrada PDF vetorizado · saída TIFF/PNG</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/static/js/upload.js"></script>
+</body>
+</html>
