@@ -185,6 +185,16 @@ def api_zip(job_id: str):
                         filename=f"refinadopaleo_{job_id}.zip")
 
 
+@app.middleware("http")
+async def _no_cache_ui(request, call_next):
+    """Evita cache stale do frontend (o navegador pode segurar JS/CSS antigos)."""
+    resp = await call_next(request)
+    path = request.url.path
+    if path == "/" or path == "/resultados" or path.startswith("/static"):
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return resp
+
+
 @app.get("/api/health")
 def api_health():
     return {"ok": True, "service": "RefinaPaleo"}

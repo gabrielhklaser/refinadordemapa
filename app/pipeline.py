@@ -185,6 +185,7 @@ class VectorLayers:
     obs_shapes: list = field(default_factory=list)         # pequenos COM contorno (observacionais)
     speck_shapes: list = field(default_factory=list)       # pequenos SEM contorno (ruído de zona)
     stroke_shapes: list = field(default_factory=list)      # traços (geográficos/anotação)
+    panel_shapes: list = field(default_factory=list)       # painéis anotados (legenda etc.) — protegidos
     text_rects: list = field(default_factory=list)         # caixas de texto
     image_rects: list = field(default_factory=list)        # imagens embutidas (bbox pt)
     field_rects: list = field(default_factory=list)        # imagens que dominam a página (campo climático)
@@ -217,7 +218,8 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
             if bbox_area_pt2 <= SMALL_FILL_PT2:
                 layers.obs_shapes.append((pts, width))   # ponto/marcador observacional
             else:
-                layers.zone_shapes.append(pts)           # painel/caixa preenchida
+                # painel anotado (legenda, caixa de textos): área toda protegida
+                layers.panel_shapes.append(pts)
                 layers.stroke_shapes.append((pts, width))
         else:  # somente traço -> camada geográfica / anotação (protegida)
             layers.stroke_shapes.append((pts, width))
@@ -251,6 +253,7 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
     layers.stats = {
         "drawings": n_drawings,
         "zone_fills": len(layers.zone_shapes),
+        "panels": len(layers.panel_shapes),
         "background_fills": n_bg_fills,
         "obs_points": len(layers.obs_shapes),
         "specks": len(layers.speck_shapes),
@@ -301,6 +304,10 @@ def rasterize_masks(layers: VectorLayers, width_px: int, height_px: int, zoom: f
         thick = max(1, int(round(w * zoom)) + 1)
         if len(p) >= 2:
             cv2.polylines(protected, [p], False, 255, thickness=thick)
+    for pts in layers.panel_shapes:
+        p = to_px(pts)
+        if len(p) >= 3:
+            cv2.fillPoly(protected, [p], 255)   # painel inteiro protegido
     for pts, w in layers.obs_shapes:
         p = to_px(pts)
         thick = max(1, int(round(w * zoom)) + 1)

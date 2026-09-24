@@ -52,7 +52,7 @@ ART_STYLES = [
             "luminoso nas áreas claras."
         ),
         "strengths": {
-            "minima":        {"speck_max_cc": 400, "inp_r": 5, "median": 5, "bil_d": 11, "bil_sc": 45, "bil_ss": 7, "bil_it": 2, "hue_sig": 5, "lift": 3, "bloom": 0.10, "sat": 0.97},
+            "minima":        {"speck_max_cc": 400, "inp_r": 5, "median": 5, "bil_d": 11, "bil_sc": 55, "bil_ss": 7, "bil_it": 2, "hue_sig": 6, "lift": 4, "bloom": 0.13, "sat": 0.95},
             "intermediaria": {"speck_max_cc": 900, "inp_r": 6, "median": 7, "bil_d": 13, "bil_sc": 65, "bil_ss": 8, "bil_it": 3, "hue_sig": 8, "lift": 5, "bloom": 0.16, "sat": 0.94},
             "intensa":       {"speck_max_cc": 2000, "inp_r": 7, "median": 9, "bil_d": 15, "bil_sc": 85, "bil_ss": 9, "bil_it": 4, "hue_sig": 12, "lift": 7, "bloom": 0.22, "sat": 0.90},
         },
@@ -68,7 +68,7 @@ ART_STYLES = [
             "visual de tela impressionista."
         ),
         "strengths": {
-            "minima":        {"speck_max_cc": 400, "inp_r": 5, "levels_l": 10, "levels_ab": 12, "brush": 7, "sat": 1.12, "contrast": 0.96},
+            "minima":        {"speck_max_cc": 400, "inp_r": 5, "levels_l": 8, "levels_ab": 10, "brush": 9, "sat": 1.16, "contrast": 0.98},
             "intermediaria": {"speck_max_cc": 900, "inp_r": 6, "levels_l": 7, "levels_ab": 9, "brush": 9, "sat": 1.20, "contrast": 1.0},
             "intensa":       {"speck_max_cc": 2000, "inp_r": 7, "levels_l": 5, "levels_ab": 7, "brush": 11, "sat": 1.28, "contrast": 1.04},
         },
@@ -84,7 +84,7 @@ ART_STYLES = [
             "com as divisões originais preservadas."
         ),
         "strengths": {
-            "minima":        {"speck_max_cc": 400, "inp_r": 5, "bil_d": 9, "bil_sc": 45, "bil_it": 2, "levels": 14, "median": 5},
+            "minima":        {"speck_max_cc": 400, "inp_r": 5, "bil_d": 9, "bil_sc": 55, "bil_it": 3, "levels": 11, "median": 5},
             "intermediaria": {"speck_max_cc": 900, "inp_r": 6, "bil_d": 11, "bil_sc": 60, "bil_it": 3, "levels": 9, "median": 7},
             "intensa":       {"speck_max_cc": 2000, "inp_r": 7, "bil_d": 13, "bil_sc": 75, "bil_it": 4, "levels": 6, "median": 9},
         },
@@ -99,7 +99,7 @@ ART_STYLES = [
             "névoa luminosa — clima etéreo de atlas ilustrado antigo."
         ),
         "strengths": {
-            "minima":        {"speck_max_cc": 400, "inp_r": 5, "hue_sig": 4, "desat": 0.88, "lift": 6, "bloom": 0.12, "contrast": 0.88, "median": 5},
+            "minima":        {"speck_max_cc": 400, "inp_r": 5, "hue_sig": 5, "desat": 0.84, "lift": 9, "bloom": 0.15, "contrast": 0.82, "median": 5},
             "intermediaria": {"speck_max_cc": 900, "inp_r": 6, "hue_sig": 6, "desat": 0.78, "lift": 10, "bloom": 0.18, "contrast": 0.78, "median": 7},
             "intensa":       {"speck_max_cc": 2000, "inp_r": 7, "hue_sig": 9, "desat": 0.68, "lift": 14, "bloom": 0.26, "contrast": 0.68, "median": 9},
         },
@@ -157,7 +157,7 @@ def _style_oleo(bgr: np.ndarray, p: dict) -> np.ndarray:
     lab[:, :, 1:3] = (lab[:, :, 1:3] - 128) * p["sat"] + 128
     lab[:, :, 0] = (lab[:, :, 0] - 128) * p["contrast"] + 128
     out = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_Lab2BGR)
-    return cv2.medianBlur(out, p["brush"])
+    return cv2.medianBlur(out, max(3, p["brush"] | 1))  # ksize ímpar
 
 
 def _style_cartoon(bgr: np.ndarray, p: dict) -> np.ndarray:
@@ -298,10 +298,14 @@ def process_pdf_artistic(pdf_path: Path, out_dir: Path, dpi: int = 120,
     masks = rasterize_masks(layers, w, h, zoom_eff)
     ctx = build_refine_masks(base_bgr, masks)
     cand = ctx["candidates"]
-    bg = _background_mask(base_bgr, cand)
-    cand = cand & ~bg                      # oceano/fundo fora da pintura
+    bg = np.zeros_like(cand)
+    if layers.stats.get("field_images"):
+        # com campo rasterizado embutido, o oceano/fundo fica fora da pintura
+        bg = _background_mask(base_bgr, cand)
+        cand = cand & ~bg
+        ctx["blend_full"] = ctx["blend_full"] * (cand[..., None].astype(np.float32))
     ctx["candidates"] = cand
-    ctx["blend_full"] = ctx["blend_full"] * (cand[..., None].astype(np.float32))
+    ctx["_bg"] = bg
     bw = _boundary_weight(base_bgr, cand)
 
     rgb = cv2.cvtColor(base_bgr, cv2.COLOR_BGR2RGB)
@@ -324,10 +328,12 @@ def process_pdf_artistic(pdf_path: Path, out_dir: Path, dpi: int = 120,
                      14 + 82.0 * (step - 1) / total)
             ts = time.time()
 
-            # 1. absorver pontos perdidos (inpainting a partir da base)
+            # 1. absorver pontos perdidos (inpainting) — zonas E fundo,
+            #    nunca sobre camadas protegidas; a pintura fica só nas zonas
             work = base_bgr.copy()
             n_sp = 0
-            specks = _detect_specks(work, cand, p["speck_max_cc"])
+            speck_area = (cand | ctx["_bg"]) & ~ctx["protected"]
+            specks = _detect_specks(work, speck_area, p["speck_max_cc"])
             if specks.any():
                 m = (specks * 255).astype(np.uint8)
                 m = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
