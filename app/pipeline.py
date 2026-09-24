@@ -111,6 +111,23 @@ TECHNOLOGIES = [
             "intensa":       {"kappa": 24, "lam": 0.12, "iters": 44},
         },
     },
+    {
+        "key": "art",
+        "name": "Pintura Digital Suave (tom artístico)",
+        "short": "ART-PNT",
+        "desc": (
+            "Acabamento pictórico das zonas climáticas: remove pontos perdidos "
+            "(specks isolados) por inpainting a partir da vizinhança, amacia "
+            "arestas duras com filtragem edge-preserving de grande alcance e "
+            "aplica tonalização suave dos canais de matiz (CIELAB a/b), dando "
+            "um tom de aquarela às transições — sem deslocar as fronteiras."
+        ),
+        "strengths": {
+            "minima":        {"median": 5, "speck_max_cc": 150, "inp_r": 4, "d": 9, "sigma_color": 30, "sigma_space": 6, "iters": 1, "hue_sigma": 2.0},
+            "intermediaria": {"median": 7, "speck_max_cc": 400, "inp_r": 5, "d": 11, "sigma_color": 45, "sigma_space": 7, "iters": 2, "hue_sigma": 3.5},
+            "intensa":       {"median": 9, "speck_max_cc": 900, "inp_r": 6, "d": 13, "sigma_color": 60, "sigma_space": 8, "iters": 3, "hue_sigma": 5.0},
+        },
+    },
 ]
 
 
@@ -121,6 +138,10 @@ def params_text(tech_key: str, p: dict) -> str:
     if tech_key == "bilateral":
         return (f"d={p['d']} · σcor={p['sigma_color']} · σesp={p['sigma_space']} · "
                 f"{p['iters']} iteração(ões) · mediana {p['median']}×{p['median']}")
+    if tech_key == "art":
+        return (f"inpaint specks ≤{p['speck_max_cc']} px² (r={p['inp_r']}) · "
+                f"bilateral d={p['d']} σcor={p['sigma_color']} ×{p['iters']} · "
+                f"tonalização a/b σ={p['hue_sigma']}")
     return f"λ={p['lam']} · κ={p['kappa']} · {p['iters']} iterações · espaço Lab"
 
 
@@ -329,10 +350,17 @@ def build_refine_masks(base_bgr: np.ndarray, masks: dict):
 
     blend = cv2.GaussianBlur(band.astype(np.float32), (5, 5), 1.2)
     blend *= candidates.astype(np.float32)          # confinamento duro
+
+    # máscara "full" (modo artístico): todo o campo de zona elegível,
+    # com bordas suavizadas (feather) para transições pictóricas naturais
+    full_f = cv2.GaussianBlur(candidates.astype(np.float32), (9, 9), 2.5)
+    full_f *= candidates.astype(np.float32)         # confinamento duro
+
     return {
         "candidates": candidates,
         "band": band,
         "blend": np.clip(blend, 0.0, 1.0)[..., None],   # HxWx1
+        "blend_full": np.clip(full_f, 0.0, 1.0)[..., None],  # HxWx1
         "zone": zone,
         "protected": protected,
         "obs": masks["obs"] > 0,
@@ -405,6 +433,81 @@ def refine_diffusion(bgr: np.ndarray, p: dict) -> np.ndarray:
 
 TECH_FUNCS = {"morph": refine_morph, "bilateral": refine_bilateral,
               "diffusion": refine_diffusion}
+
+
+# ----------------------------------------------------------------------------
+# Tecnologia artística (opera direto em BGR + máscara elegível)
+# ----------------------------------------------------------------------------
+def _detect_specks(bgr: np.ndarray, candidates: np.ndarray,
+                   max_cc_px: int, diff_thr: float = 24.0) -> np.ndarray:
+    """Detecta 'pontos perdidos': pequenos componentes com cor destoante da
+    vizinhança (o que a mediana elimina), restritos à área elegível."""
+    k = 7
+    med = cv2.medianBlur(bgr, k)
+    diff = np.abs(bgr.astype(np.int16) - med.astype(np.int16)).sum(-1)
+    dst = diff > diff_thr
+    dst &= candidates
+    if not dst.any():
+        return dst
+    num, lab, stats, _ = cv2.connectedComponentsWithStats(dst.astype(np.uint8), connectivity=8)
+    if num <= 1:
+        return dst
+    small = (stats[1:, 4] <= max_cc_px)
+    if not small.any():
+        return np.zeros_like(dst)
+    ids = np.nonzero(small)[0] + 1
+    return np.isin(lab, ids) & dst
+
+
+def refine_artistic(bgr: np.ndarray, p: dict, candidates: np.ndarray) -> tuple:
+    """Tecnologia 4 — Pintura Digital Suave.
+
+    1. Remove pontos perdidos por inpainting (Telea) restrito à área elegível;
+    2. Suaviza arestas duras com filtragem bilateral de grande alcance;
+    3. Tonalização pictórica: suavização seletiva dos canais de matiz (a/b)
+       com preservação parcial da luminosidade (L) — efeito aquarela.
+
+    Retorna (imagem BGR, n_specks_removidos).
+    """
+    work = bgr.copy()
+
+    # -- 1. pontos perdidos -> inpainting local -----------------------------
+    specks = _detect_specks(work, candidates, p["speck_max_cc"])
+    n_specks = 0
+    if specks.any():
+        m = (specks * 255).astype(np.uint8)
+        m = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        work = cv2.inpaint(work, m, p["inp_r"], cv2.INPAINT_TELEA)
+        n_specks = int(specks.sum())
+
+    # -- 2. arestas duras -> bilateral de grande alcance (pictórico) --------
+    out = work
+    for _ in range(p["iters"]):
+        out = cv2.bilateralFilter(out, d=p["d"], sigmaColor=p["sigma_color"],
+                                  sigmaSpace=p["sigma_space"])
+
+    # -- 3. tonalização aquarelada dos canais de matiz ----------------------
+    lab = cv2.cvtColor(out, cv2.COLOR_BGR2Lab).astype(np.float32)
+    L = lab[:, :, 0]
+    sig = p["hue_sigma"]
+    a_s = cv2.GaussianBlur(lab[:, :, 1], (0, 0), sig)
+    b_s = cv2.GaussianBlur(lab[:, :, 2], (0, 0), sig)
+    # preserva matiz original nas bordas fortes (evita sangramento entre zonas)
+    gx = cv2.Sobel(L, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(L, cv2.CV_32F, 0, 1, ksize=3)
+    edge = np.clip((np.sqrt(gx * gx + gy * gy) - 6.0) / 18.0, 0.0, 1.0)
+    w = (1.0 - edge)[..., None]
+    lab[:, :, 1:2] = lab[:, :, 1:2] * (1 - w) + a_s[..., None] * w
+    lab[:, :, 2:3] = lab[:, :, 2:3] * (1 - w) + b_s[..., None] * w
+    # leve clareada pictórica da luminosidade (ar de aquarela)
+    L_soft = cv2.GaussianBlur(L, (0, 0), sig * 0.8)
+    lab[:, :, 0] = L * 0.82 + L_soft * 0.18 + 1.2
+    lab = np.clip(lab, 0, 255).astype(np.uint8)
+    out = cv2.cvtColor(lab, cv2.COLOR_Lab2BGR)
+
+    # mediana final discreta para uniformizar o traço
+    out = cv2.medianBlur(out, 3)
+    return out, n_specks
 
 
 # ----------------------------------------------------------------------------
@@ -676,7 +779,8 @@ def process_pdf(pdf_path: Path, out_dir: Path, dpi: int = 120,
     vector_errors = []
 
     for tech in TECHNOLOGIES:
-        fn = TECH_FUNCS[tech["key"]]
+        is_art = tech["key"] == "art"
+        fn = TECH_FUNCS.get(tech["key"])
         versions = []
         for skey in ("minima", "intermediaria", "intensa"):
             step += 1
@@ -686,9 +790,17 @@ def process_pdf(pdf_path: Path, out_dir: Path, dpi: int = 120,
                      15 + 80.0 * (step - 1) / total_steps)
             t0 = time.time()
 
-            processed = fn(base_bgr, params)
-            out_bgr = composite(base_bgr, processed, ctx["blend"], ctx["protected"])
+            if is_art:
+                processed, n_specks = refine_artistic(base_bgr, params,
+                                                      ctx["candidates"])
+                blend = ctx["blend_full"]
+            else:
+                processed = fn(base_bgr, params)
+                n_specks = 0
+                blend = ctx["blend"]
+            out_bgr = composite(base_bgr, processed, blend, ctx["protected"])
             metrics = reliability_report(base_bgr, out_bgr, ctx)
+            metrics["specks_removed"] = n_specks
             elapsed = time.time() - t0
 
             base_name = f"refinado_{tech['key']}_{skey}"

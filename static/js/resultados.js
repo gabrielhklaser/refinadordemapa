@@ -112,6 +112,7 @@
             <div class="vers-metrics">
               <span class="badge">erro vetorial ${m.vector_max_diff_px} px</span>
               <span class="badge">obs. ${m.obs_max_diff_px} px</span>
+              ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pts removidos</span>` : ""}
               <span class="badge">PSNR ${fmt(m.psnr_db, 1)} dB</span>
             </div>
             <div class="vers-actions">
@@ -162,6 +163,7 @@
         <span class="badge ok">erro vetorial: ${m.vector_max_diff_px} px</span>
         <span class="badge ok">erro observacional: ${m.obs_max_diff_px} px</span>
         <span class="badge">deslocamento: ${m.shift_px === null || m.shift_px === undefined ? "—" : fmt(m.shift_px, 1) + " px"}</span>
+        ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pontos perdidos removidos</span>` : ""}
         <span class="badge">PSNR: ${fmt(m.psnr_db, 1)} dB</span>
         <span class="badge">SSIM: ${fmt(m.ssim, 4)}</span>`;
       $("modal-actions").innerHTML = `
