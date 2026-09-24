@@ -69,6 +69,18 @@ a { color: var(--accent); }
 }
 .hero p.sub { color: var(--ink-soft); font-size: 1.02rem; max-width: 760px; margin: 0; }
 
+/* ---------- seletor de modo ---------- */
+.mode-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.mode-label { font-size: .8rem; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .5px; }
+.mode-switch { display: inline-flex; background: #eef2f6; border: 1px solid var(--line); border-radius: 10px; padding: 4px; gap: 4px; }
+.mode-btn {
+  font: inherit; font-weight: 600; font-size: .86rem; border: none;
+  background: transparent; color: var(--ink-soft); padding: 8px 16px;
+  border-radius: 8px; cursor: pointer; transition: background .15s, color .15s;
+}
+.mode-btn.on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(15,30,51,.14); }
+.mode-btn.on.art-on { background: #f6eefc; color: #6d28d9; }
+
 /* ---------- cards / upload ---------- */
 .card {
   background: var(--surface); border: 1px solid var(--line);

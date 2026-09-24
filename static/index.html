@@ -44,6 +44,13 @@
     </section>
 
     <section class="card upload-card" id="upload-card">
+      <div class="mode-row">
+        <span class="mode-label">Modo de processamento:</span>
+        <div class="mode-switch" id="mode-switch">
+          <button class="mode-btn on" data-mode="sci" type="button">🔬 Científico (skill)</button>
+          <button class="mode-btn" data-mode="art" type="button">🎨 Artístico</button>
+        </div>
+      </div>
       <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Selecionar PDF">
         <div class="dz-icon">🗺️</div>
         <div class="dz-title">Arraste seu PDF vetorizado aqui</div>
@@ -78,10 +85,14 @@
       <div class="note">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16.5v.5"/></svg>
         <span>
-          <strong>Garantias científicas:</strong> as camadas vetoriais (costa, graticule, molduras),
+          <span id="note-sci"><strong>Garantias científicas:</strong> as camadas vetoriais (costa, graticule, molduras),
           textos e pontos observacionais são isolados e restaurados <em>bit a bit</em> — erro posicional
           de 0&nbsp;px em todas as versões. O refinamento atua exclusivamente nas fronteiras entre zonas
-          climáticas, e cada versão recebe uma conferência de confiabilidade (% de mudança de zonas).
+          climáticas, e cada versão recebe uma conferência de confiabilidade (% de mudança de zonas).</span>
+          <span id="note-art" hidden><strong>Seção Artística:</strong> rigor científico suspenso — o mapa é
+          reinterpretado em 4 estilos pictóricos (Aquarela, Óleo, Cartoon e Pastel), cada um em 3
+          intensidades. Mantêm-se apenas duas preservações: <strong>pontos e vetores não se movem</strong>
+          (restaurados bit a bit) e <strong>as zonas não mudam de lugar</strong> (fronteiras com pixels originais).</span>
         </span>
       </div>
     </section>

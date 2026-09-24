@@ -195,6 +195,8 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
     """Classifica os desenhos vetoriais e imagens embutidas da página."""
     layers = VectorLayers()
     n_drawings = 0
+    page_area = max(page.rect.width, 0.0) * max(page.rect.height, 0.0)
+    n_bg_fills = 0
     for d in page.get_drawings():
         n_drawings += 1
         fill = d.get("fill")
@@ -207,6 +209,8 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
         if fill is not None and stroke is None:
             if bbox_area_pt2 <= SMALL_FILL_PT2:
                 layers.speck_shapes.append(pts)          # ruído de vetorização
+            elif bbox_area_pt2 >= 0.7 * page_area:
+                n_bg_fills += 1                          # fundo da página: ignora
             else:
                 layers.zone_shapes.append(pts)           # zona climática
         elif fill is not None and stroke is not None:
@@ -247,6 +251,7 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
     layers.stats = {
         "drawings": n_drawings,
         "zone_fills": len(layers.zone_shapes),
+        "background_fills": n_bg_fills,
         "obs_points": len(layers.obs_shapes),
         "specks": len(layers.speck_shapes),
         "geo_lines": len(layers.stroke_shapes),
@@ -836,6 +841,7 @@ def process_pdf(pdf_path: Path, out_dir: Path, dpi: int = 120,
         })
 
     payload = {
+        "mode": "cientifico",
         "job_id": out_dir.name,
         "file_name": file_name,
         "pages": n_pages,

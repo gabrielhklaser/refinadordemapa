@@ -19,6 +19,24 @@
   let selectedFile = null;
   let busy = false;
   let pollTimer = null;
+  let mode = "sci";
+
+  const btnSci = document.querySelector('.mode-btn[data-mode="sci"]');
+  const btnArt = document.querySelector('.mode-btn[data-mode="art"]');
+  const noteSci = $("note-sci");
+  const noteArt = $("note-art");
+
+  function setMode(m) {
+    mode = m;
+    btnSci.classList.toggle("on", m === "sci");
+    btnArt.classList.toggle("on", m === "art");
+    btnArt.classList.toggle("art-on", m === "art");
+    noteSci.hidden = m !== "sci";
+    noteArt.hidden = m !== "art";
+    btnProcess.innerHTML = m === "art" ? "🎨 Criar mapa artístico" : "⚙️ Refinar mapa";
+  }
+  btnSci.addEventListener("click", () => setMode("sci"));
+  btnArt.addEventListener("click", () => setMode("art"));
 
   function showToast(msg) {
     toast.textContent = msg;
@@ -101,10 +119,11 @@
     btnProcess.disabled = true;
     btnSample.disabled = true;
     progressCard.classList.add("on");
-    setProgress(1, "Enviando mapa…");
+    setProgress(1, mode === "art" ? "Enviando mapa para a Seção Artística…" : "Enviando mapa…");
 
     const fd = new FormData();
     fd.append("dpi", dpiSel.value);
+    fd.append("mode", mode);
     if (withSample) fd.append("sample", "true");
     else fd.append("pdf", selectedFile);
 

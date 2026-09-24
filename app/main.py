@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 
 from sample_map import generate_sample_pdf, generate_sample_gradient_pdf
 from pipeline import process_pdf
+from artistic import process_pdf_artistic
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "static"
@@ -72,14 +73,18 @@ def _write_status(job_id: str, payload: dict):
     (d / "status.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
-def _run_job(job_id: str, pdf_path: Path, dpi: int):
+def _run_job(job_id: str, pdf_path: Path, dpi: int, mode: str = "sci"):
     with _jobs_lock:
         try:
             def progress(fase: str, pct: float):
                 _write_status(job_id, {"state": "running", "message": fase, "pct": round(pct, 1)})
 
-            _write_status(job_id, {"state": "running", "message": "Inicializando pipeline…", "pct": 2})
-            payload = process_pdf(pdf_path, DATA / job_id, dpi=dpi, progress=progress)
+            if mode == "art":
+                _write_status(job_id, {"state": "running", "message": "Preparando a Seção Artística…", "pct": 2})
+                payload = process_pdf_artistic(pdf_path, DATA / job_id, dpi=dpi, progress=progress)
+            else:
+                _write_status(job_id, {"state": "running", "message": "Inicializando pipeline…", "pct": 2})
+                payload = process_pdf(pdf_path, DATA / job_id, dpi=dpi, progress=progress)
             _write_status(job_id, {"state": "done", "message": "Processamento concluído", "pct": 100})
         except Exception as exc:  # noqa: BLE001
             traceback.print_exc()
@@ -91,6 +96,7 @@ async def api_process(
     pdf: UploadFile | None = File(None),
     sample: str = Form("false"),
     dpi: int = Form(120),
+    mode: str = Form("sci"),
 ):
     import uuid
 
@@ -124,7 +130,7 @@ async def api_process(
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(400, f"PDF inválido: {exc}") from exc
 
-    threading.Thread(target=_run_job, args=(job_id, pdf_path, dpi), daemon=True).start()
+    threading.Thread(target=_run_job, args=(job_id, pdf_path, dpi, mode), daemon=True).start()
     return {"job_id": job_id}
 
 

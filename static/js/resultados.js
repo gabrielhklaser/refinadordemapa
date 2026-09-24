@@ -1,8 +1,9 @@
-/* RefinaPaleo — página de resultados */
+/* RefinaPaleo — página de resultados (científico e artístico) */
 (function () {
   const $ = (id) => document.getElementById(id);
   const job = new URLSearchParams(window.location.search).get("job");
   const toast = $("toast");
+  const isArt = () => window.__jobMode === "artistico";
 
   function showToast(msg) {
     toast.textContent = msg;
@@ -34,7 +35,10 @@
       if (!r.ok) throw new Error("Não foi possível carregar este job (" + r.status + ").");
       return r.json();
     })
-    .then(render)
+    .then((data) => {
+      window.__jobMode = data.mode || "cientifico";
+      render(data);
+    })
     .catch((e) => {
       $("loading").style.display = "none";
       const eb = $("error-box");
@@ -43,21 +47,52 @@
     });
 
   function render(data) {
+    const art = isArt();
     $("loading").style.display = "none";
     $("content").hidden = false;
-    window.document.title = `Resultados — ${data.file_name} · RefinaPaleo`;
+    window.document.title = `${art ? "Mapa artístico" : "Resultados"} — ${data.file_name} · RefinaPaleo`;
 
     /* ---------- toolbar ---------- */
     $("chip-file").textContent = `📄 ${data.file_name}`;
     $("chip-px").textContent = `🖼️ ${data.px[0]}×${data.px[1]} px · ${data.dpi} dpi${data.pages > 1 ? ` · página 1/${data.pages}` : ""}`;
     $("btn-zip").href = `/api/jobs/${job}/zip`;
 
-    /* ---------- resumo global ---------- */
-    $("st-vers").textContent = data.summary.versions;
-    $("st-err").textContent = `${data.summary.max_vector_error_px} px`;
-    const shifts = data.technologies.flatMap(t => t.versions.map(v => v.metrics.shift_px)).filter(v => v !== null && v !== undefined);
-    $("st-shift").textContent = shifts.length ? `${Math.max(...shifts).toFixed(1)} px` : "0 px";
-    $("st-chg").textContent = `${fmt(data.summary.max_changed_pct)}%`;
+    /* ---------- banner ---------- */
+    if (art) {
+      $("banner-big").textContent = "🎨 Seção Artística — rigor científico suspenso";
+      $("banner-sub").textContent =
+        "O mapa foi reinterpretado em 4 estilos pictóricos. Preservações mantidas: pontos observacionais e " +
+        "vetores geográficos restaurados bit a bit · fronteiras das zonas com os pixels originais (não mudam de lugar).";
+      $("st-err-label").textContent = "pontos/vetores alterados";
+      $("st-shift-label").textContent = "fronteiras movidas";
+      $("st-chg-label").textContent = "pontos perdidos absorvidos";
+      $("st-vers").textContent = data.summary.versions;
+      $("st-err").textContent = `${data.summary.max_protected_error_px} px`;
+      const bmax = Math.max(0, ...(data.styles || []).flatMap((s) => s.versions.map((v) => v.metrics.boundary_max_diff_px || 0)));
+      $("st-shift").textContent = `${bmax} px`;
+      $("st-chg").textContent = (data.summary.total_specks_removed || 0).toLocaleString("pt-BR");
+      $("sec-tech-kicker").textContent = "Seção artística · 4 estilos pictóricos × 3 intensidades";
+      $("sec-tech-title").textContent = "Mapas artísticos";
+      $("sec-tech-sub").textContent = "Clique em um cartão para abrir o comparativo (original · obra) e baixar em TIFF ou PNG.";
+      $("confiabilidade").hidden = true;
+      $("metodologia").hidden = true;
+    } else {
+      $("banner-big").textContent = "✅ Conferência de confiabilidade aprovada";
+      $("banner-sub").textContent = "Camadas vetoriais geográficas e pontos observacionais restaurados bit a bit — verificação por correlação cruzada e diferença absoluta.";
+      $("st-err-label").textContent = "erro vetorial máx.";
+      $("st-shift-label").textContent = "deslocamento medido";
+      $("st-chg-label").textContent = "mudança máx. nas zonas";
+      $("sec-tech-kicker").textContent = "Saída · 4 tecnologias científicas × 3 intensidades";
+      $("sec-tech-title").textContent = "Mapas refinados";
+      $("sec-tech-sub").textContent = "Clique em um cartão para abrir o comparativo (original · refinado · mapa de alteração) e baixar em TIFF ou PNG.";
+      $("confiabilidade").hidden = false;
+      $("metodologia").hidden = false;
+      $("st-vers").textContent = data.summary.versions;
+      $("st-err").textContent = `${data.summary.max_vector_error_px} px`;
+      const shifts = (data.technologies || []).flatMap((t) => t.versions.map((v) => v.metrics.shift_px)).filter((v) => v !== null && v !== undefined);
+      $("st-shift").textContent = shifts.length ? `${Math.max(...shifts).toFixed(1)} px` : "0 px";
+      $("st-chg").textContent = `${fmt(data.summary.max_changed_pct)}%`;
+    }
 
     /* ---------- original ---------- */
     $("orig-img").src = fileURL("original.png");
@@ -72,80 +107,94 @@
     ];
     if (L.embedded_images !== undefined) kvRows.push(["Imagens embutidas", L.embedded_images]);
     kvRows.push(["Tipo de campo climático", L.field_type || "—"]);
-    $("layers-kv").innerHTML = kvRows
-      .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-    $("orig-chips").innerHTML = `
-      <span class="chip">Espaço de processamento: ${data.pipeline.espaco_cor}</span>
-      <span class="chip">Faixa de refinamento: ±${data.pipeline.faixa_refinamento_px} px</span>
-      <span class="chip">Margem protegida: ${data.pipeline.exclusao_protegida_px} px</span>
-      <span class="chip">ΔE limiar: ${data.pipeline.limiar_delta_e}</span>`;
+    $("layers-kv").innerHTML = kvRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    $("orig-chips").innerHTML = art
+      ? `<span class="chip">Modo artístico — rigor suspenso</span>
+         <span class="chip ok">Preservado: pontos + vetores (bit a bit)</span>
+         <span class="chip ok">Preservado: posição das zonas</span>`
+      : `<span class="chip">Espaço de processamento: ${data.pipeline.espaco_cor}</span>
+         <span class="chip">Faixa de refinamento: ±${data.pipeline.faixa_refinamento_px} px</span>
+         <span class="chip">Margem protegida: ${data.pipeline.exclusao_protegida_px} px</span>
+         <span class="chip">ΔE limiar: ${data.pipeline.limiar_delta_e}</span>`;
 
-    /* ---------- tecnologias ---------- */
+    /* ---------- galeria (estilos ou tecnologias) ---------- */
+    const groups = art ? data.styles : data.technologies;
     const list = $("tech-list");
     list.innerHTML = "";
     const tableRows = [];
 
-    data.technologies.forEach((tech, ti) => {
+    groups.forEach((grp, gi) => {
       const block = document.createElement("div");
       block.className = "tech-block";
+      const icon = grp.emoji ? `${grp.emoji} ` : "";
       block.innerHTML = `
         <div class="tech-head">
-          <span class="tech-tag">${tech.short}</span>
+          <span class="tech-tag">${grp.short}</span>
           <div>
-            <h3>${tech.name}</h3>
-            <p>${tech.desc}</p>
+            <h3>${icon}${grp.name}</h3>
+            <p>${grp.desc}</p>
           </div>
         </div>
         <div class="vers-grid"></div>`;
       const grid = block.querySelector(".vers-grid");
 
-      tech.versions.forEach((v) => {
+      grp.versions.forEach((v) => {
         const m = v.metrics;
+        let badges;
+        if (art) {
+          badges = `
+            <span class="badge low">pontos/vetores ${m.protected_max_diff_px} px</span>
+            <span class="badge low">fronteiras ${m.boundary_max_diff_px} px</span>
+            ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pts absorvidos</span>` : ""}`;
+        } else {
+          badges = `
+            <span class="badge">erro vetorial ${m.vector_max_diff_px} px</span>
+            <span class="badge">obs. ${m.obs_max_diff_px} px</span>
+            ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pts removidos</span>` : ""}
+            <span class="badge">PSNR ${fmt(m.psnr_db, 1)} dB</span>`;
+        }
         const card = document.createElement("div");
         card.className = "vers-card";
         card.innerHTML = `
-          <img loading="lazy" src="${fileURL(v.files.thumb)}" alt="${tech.name} — ${v.label}">
+          <img loading="lazy" src="${fileURL(v.files.thumb)}" alt="${grp.name} — ${v.label}">
           <div class="vers-body">
             <div class="vers-title"><h4>${v.label}</h4>
-              <span class="badge ${chgBadge(m.changed_pct)}">zonas +${fmt(m.changed_pct)}%</span></div>
+              ${art ? "" : `<span class="badge ${chgBadge(m.changed_pct)}">zonas +${fmt(m.changed_pct)}%</span>`}</div>
             <div class="vers-params">${v.params_text}</div>
-            <div class="vers-metrics">
-              <span class="badge">erro vetorial ${m.vector_max_diff_px} px</span>
-              <span class="badge">obs. ${m.obs_max_diff_px} px</span>
-              ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pts removidos</span>` : ""}
-              <span class="badge">PSNR ${fmt(m.psnr_db, 1)} dB</span>
-            </div>
+            <div class="vers-metrics">${badges}</div>
             <div class="vers-actions">
-              <a class="btn btn-ghost btn-small" href="${fileURL(v.files.tif)}" download="RefinaPaleo_${tech.key}_${v.key}.tif">⬇ TIF</a>
-              <a class="btn btn-primary btn-small" href="${fileURL(v.files.png)}" download="RefinaPaleo_${tech.key}_${v.key}.png">⬇ PNG</a>
+              <a class="btn btn-ghost btn-small" href="${fileURL(v.files.tif)}" download="RefinaPaleo_${grp.key}_${v.key}.tif">⬇ TIF</a>
+              <a class="btn btn-primary btn-small" href="${fileURL(v.files.png)}" download="RefinaPaleo_${grp.key}_${v.key}.png">⬇ PNG</a>
             </div>
             <div class="mini-note">Processado em ${fmt(v.seconds, 1)} s · clique no cartão p/ comparativo</div>
           </div>`;
         card.addEventListener("click", (e) => {
           if (e.target.closest("a")) return;
-          openModal(tech, v);
+          openModal(grp, v);
         });
         grid.appendChild(card);
 
-        tableRows.push(`
-          ${v.key === "minima" ? `<tr class="tech-sep"><td colspan="10">${tech.short} — ${tech.name}</td></tr>` : ""}
-          <tr>
-            <td class="tech-cell"><b>${tech.short}</b><span>${ti + 1}ª tecnologia</span></td>
-            <td>${v.label}</td>
-            <td style="font-size:.76rem;color:var(--ink-faint);font-family:var(--mono);">${v.params_text}</td>
-            <td class="num">${fmt(m.changed_pct, 3)}%</td>
-            <td class="num"><span class="ok-check">${m.vector_max_diff_px} px</span></td>
-            <td class="num"><span class="ok-check">${m.obs_max_diff_px} px</span></td>
-            <td class="num">${m.shift_px === null || m.shift_px === undefined ? "—" : fmt(m.shift_px, 1) + " px"}</td>
-            <td class="num">${fmt(m.psnr_db, 1)}</td>
-            <td class="num">${fmt(m.ssim, 4)}</td>
-            <td><span class="ok-check">✓ Aprovada</span></td>
-          </tr>`);
+        if (!art) {
+          tableRows.push(`
+            ${v.key === "minima" ? `<tr class="tech-sep"><td colspan="10">${grp.short} — ${grp.name}</td></tr>` : ""}
+            <tr>
+              <td class="tech-cell"><b>${grp.short}</b><span>${gi + 1}ª tecnologia</span></td>
+              <td>${v.label}</td>
+              <td style="font-size:.76rem;color:var(--ink-faint);font-family:var(--mono);">${v.params_text}</td>
+              <td class="num">${fmt(m.changed_pct, 3)}%</td>
+              <td class="num"><span class="ok-check">${m.vector_max_diff_px} px</span></td>
+              <td class="num"><span class="ok-check">${m.obs_max_diff_px} px</span></td>
+              <td class="num">${m.shift_px === null || m.shift_px === undefined ? "—" : fmt(m.shift_px, 1) + " px"}</td>
+              <td class="num">${fmt(m.psnr_db, 1)}</td>
+              <td class="num">${fmt(m.ssim, 4)}</td>
+              <td><span class="ok-check">✓ Aprovada</span></td>
+            </tr>`);
+        }
       });
       list.appendChild(block);
     });
 
-    $("tbl-body").innerHTML = tableRows.join("");
+    if (!art) $("tbl-body").innerHTML = tableRows.join("");
 
     /* ---------- modal ---------- */
     const modal = $("modal");
@@ -153,23 +202,27 @@
     modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("on"); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") modal.classList.remove("on"); });
 
-    function openModal(tech, v) {
-      $("modal-title").textContent = `${tech.name} — intensidade ${v.label}`;
-      $("modal-img").src = fileURL(v.files.cmp);
+    function openModal(grp, v) {
       const m = v.metrics;
-      $("modal-metrics").innerHTML = `
-        <span class="badge ${chgBadge(m.changed_pct)}">mudança nas zonas: ${fmt(m.changed_pct, 3)}%</span>
-        <span class="badge">ΔE máx. nas zonas: ${fmt(m.delta_e_max_zone, 1)}</span>
-        <span class="badge ok">erro vetorial: ${m.vector_max_diff_px} px</span>
-        <span class="badge ok">erro observacional: ${m.obs_max_diff_px} px</span>
-        <span class="badge">deslocamento: ${m.shift_px === null || m.shift_px === undefined ? "—" : fmt(m.shift_px, 1) + " px"}</span>
-        ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pontos perdidos removidos</span>` : ""}
-        <span class="badge">PSNR: ${fmt(m.psnr_db, 1)} dB</span>
-        <span class="badge">SSIM: ${fmt(m.ssim, 4)}</span>`;
+      const icon = grp.emoji ? `${grp.emoji} ` : "";
+      $("modal-title").textContent = `${icon}${grp.name} — intensidade ${v.label}`;
+      $("modal-img").src = fileURL(v.files.cmp);
+      $("modal-metrics").innerHTML = art
+        ? `<span class="badge low">pontos/vetores: ${m.protected_max_diff_px} px</span>
+           <span class="badge low">fronteiras das zonas: ${m.boundary_max_diff_px} px (no lugar)</span>
+           ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pontos perdidos absorvidos</span>` : ""}`
+        : `<span class="badge ${chgBadge(m.changed_pct)}">mudança nas zonas: ${fmt(m.changed_pct, 3)}%</span>
+           <span class="badge">ΔE máx. nas zonas: ${fmt(m.delta_e_max_zone, 1)}</span>
+           <span class="badge ok">erro vetorial: ${m.vector_max_diff_px} px</span>
+           <span class="badge ok">erro observacional: ${m.obs_max_diff_px} px</span>
+           <span class="badge">deslocamento: ${m.shift_px === null || m.shift_px === undefined ? "—" : fmt(m.shift_px, 1) + " px"}</span>
+           ${m.specks_removed ? `<span class="badge mid">✨ ${m.specks_removed.toLocaleString("pt-BR")} pontos perdidos removidos</span>` : ""}
+           <span class="badge">PSNR: ${fmt(m.psnr_db, 1)} dB</span>
+           <span class="badge">SSIM: ${fmt(m.ssim, 4)}</span>`;
       $("modal-actions").innerHTML = `
-        <a class="btn btn-ghost" href="${fileURL(v.files.tif)}" download="RefinaPaleo_${tech.key}_${v.key}.tif">⬇ Baixar TIFF</a>
-        <a class="btn btn-primary" href="${fileURL(v.files.png)}" download="RefinaPaleo_${tech.key}_${v.key}.png">⬇ Baixar PNG</a>
-        <a class="btn btn-ghost" href="${fileURL(v.files.cmp)}" download>⬇ Folha de conferência</a>`;
+        <a class="btn btn-ghost" href="${fileURL(v.files.tif)}" download="RefinaPaleo_${grp.key}_${v.key}.tif">⬇ Baixar TIFF</a>
+        <a class="btn btn-primary" href="${fileURL(v.files.png)}" download="RefinaPaleo_${grp.key}_${v.key}.png">⬇ Baixar PNG</a>
+        <a class="btn btn-ghost" href="${fileURL(v.files.cmp)}" download>⬇ Folha de comparativo</a>`;
       modal.classList.add("on");
     }
   }

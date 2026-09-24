@@ -39,6 +39,19 @@ de confiabilidade — implementando a skill `refinamento-mapas-paleo`.
 Dois mapas de exemplo acompanham a plataforma: zonas vetoriais (LGM, 21 ka) e
 aridez interpolada (115 Ma, estilo `knn_idw_gradient` com campo rasterizado).
 
+## Seção Artística (modo pictórico)
+
+Além do fluxo científico, a plataforma oferece a **Seção Artística**: rigor
+científico suspenso, o mapa é reinterpretado em 4 estilos pictóricos × 3
+intensidades (12 obras), mantendo **apenas** duas preservações absolutas:
+
+- **Pontos observacionais e vetores geográficos não se movem** (restaurados bit a bit);
+- **As zonas climáticas não mudam de lugar** (núcleo das fronteiras com os pixels originais;
+  o oceano/fundo permanece original, fora da pintura).
+
+Estilos: 🖌️ Aquarela · 🎨 Pintura a Óleo · 🌈 Cartoon/Pôster · 🌸 Pastel Sonhador.
+Pontos perdidos (*specks*) são absorvidos por inpainting antes da pintura.
+
 ## Como rodar
 
 ```bash
@@ -56,9 +69,10 @@ TIFF/PNG ficam em `/resultados?job=<id>`.
 
 ```
 app/
-  main.py         API FastAPI (upload, jobs, downloads, zip)
-  pipeline.py     desacoplamento de camadas, 3 tecnologias, confiabilidade, exportação
-  sample_map.py   gerador do mapa paleoclimático vetorial de exemplo (PDF)
+  main.py         API FastAPI (upload, jobs, downloads, zip, modo sci/art)
+  pipeline.py     desacoplamento de camadas, 4 tecnologias, confiabilidade, exportação
+  artistic.py     Seção Artística (4 estilos pictóricos × 3 intensidades)
+  sample_map.py   gerador dos mapas de exemplo (zonas vetoriais + aridez rasterizada)
 static/           páginas (upload + resultados), CSS e JS
 data/jobs/        artefatos gerados por job (gitignored)
 ```

@@ -46,14 +46,14 @@
       <!-- banner de conferência global -->
       <section class="summary-banner" id="summary">
         <div>
-          <div class="big">✅ Conferência de confiabilidade aprovada</div>
-          <div class="sub">Camadas vetoriais geográficas e pontos observacionais restaurados bit a bit — verificação por correlação cruzada e diferença absoluta.</div>
+          <div class="big" id="banner-big">✅ Conferência de confiabilidade aprovada</div>
+          <div class="sub" id="banner-sub">Camadas vetoriais geográficas e pontos observacionais restaurados bit a bit — verificação por correlação cruzada e diferença absoluta.</div>
         </div>
         <span class="spacer"></span>
         <div class="stat"><b id="st-vers">—</b><span>versões geradas</span></div>
-        <div class="stat"><b id="st-err">0 px</b><span>erro vetorial máx.</span></div>
-        <div class="stat"><b id="st-shift">0 px</b><span>deslocamento medido</span></div>
-        <div class="stat"><b id="st-chg">—</b><span>mudança máx. nas zonas</span></div>
+        <div class="stat"><b id="st-err">0 px</b><span id="st-err-label">erro vetorial máx.</span></div>
+        <div class="stat"><b id="st-shift">0 px</b><span id="st-shift-label">deslocamento medido</span></div>
+        <div class="stat"><b id="st-chg">—</b><span id="st-chg-label">mudança máx. nas zonas</span></div>
       </section>
 
       <!-- mapa original -->
@@ -76,9 +76,9 @@
       <!-- tecnologias -->
       <section class="section" id="tech-section">
         <div class="section-head">
-          <span class="kicker">Saída · 3 tecnologias científicas + modo artístico × 3 intensidades</span>
-          <h2>Mapas refinados</h2>
-          <p>Clique em um cartão para abrir o comparativo (original · refinado · mapa de alteração) e baixar em TIFF ou PNG.</p>
+          <span class="kicker" id="sec-tech-kicker">Saída · 4 tecnologias científicas × 3 intensidades</span>
+          <h2 id="sec-tech-title">Mapas refinados</h2>
+          <p id="sec-tech-sub">Clique em um cartão para abrir o comparativo (original · refinado · mapa de alteração) e baixar em TIFF ou PNG.</p>
         </div>
         <div id="tech-list"></div>
       </section>
