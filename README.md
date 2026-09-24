@@ -28,6 +28,17 @@ de confiabilidade — implementando a skill `refinamento-mapas-paleo`.
 | BILAT-EP | Filtragem Bilateral Edge-Preserving iterativa | σcor 18 → 48 |
 | DIFF-PM | Difusão Anisotrópica de Perona–Malik (Lab) | κ 10 → 24, 12 → 44 iterações |
 
+### Tipos de PDF suportados
+
+- **Zonas vetoriais** — preenchimentos vetoriais por zona climática.
+- **Híbrido (campo rasterizado embutido)** — mapas interpolados (ex.: kNN+IDW
+  com gradiente) exportados com o campo climático como imagem dentro do PDF e
+  o restante (costa, graticule, pontos, textos) em vetor. A imagem é detectada
+  automaticamente e tratada como região climática elegível ao refinamento.
+
+Dois mapas de exemplo acompanham a plataforma: zonas vetoriais (LGM, 21 ka) e
+aridez interpolada (115 Ma, estilo `knn_idw_gradient` com campo rasterizado).
+
 ## Como rodar
 
 ```bash

@@ -27,7 +27,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from sample_map import generate_sample_pdf
+from sample_map import generate_sample_pdf, generate_sample_gradient_pdf
 from pipeline import process_pdf
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -89,7 +89,7 @@ def _run_job(job_id: str, pdf_path: Path, dpi: int):
 @app.post("/api/process")
 async def api_process(
     pdf: UploadFile | None = File(None),
-    sample: bool = Form(False),
+    sample: str = Form("false"),
     dpi: int = Form(120),
 ):
     import uuid
@@ -99,9 +99,13 @@ async def api_process(
     d = DATA / job_id
     d.mkdir(parents=True, exist_ok=True)
 
-    if sample:
-        pdf_path = d / "mapa_exemplo_paleoclimatico.pdf"
-        generate_sample_pdf(str(pdf_path))
+    if sample in ("true", "zones", "gradient"):
+        if sample == "gradient":
+            pdf_path = d / "mapa_exemplo_aridez_115ma.pdf"
+            generate_sample_gradient_pdf(str(pdf_path))
+        else:
+            pdf_path = d / "mapa_exemplo_paleoclimatico.pdf"
+            generate_sample_pdf(str(pdf_path))
     else:
         if pdf is None or not (pdf.filename or "").lower().endswith(".pdf"):
             raise HTTPException(400, "Envie um arquivo PDF vetorizado (ou marque a opção de exemplo).")

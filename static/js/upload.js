@@ -8,6 +8,7 @@
   const btnProcess = $("btn-process");
   const btnSample = $("btn-sample");
   const dpiSel = $("dpi");
+  const sampleTypeSel = $("sample-type");
   const progressCard = $("progress-card");
   const progressMsg = $("progress-msg");
   const progressPct = $("progress-pct");

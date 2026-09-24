@@ -34,6 +34,7 @@ Métricas de confiabilidade
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -164,11 +165,13 @@ class VectorLayers:
     speck_shapes: list = field(default_factory=list)       # pequenos SEM contorno (ruído de zona)
     stroke_shapes: list = field(default_factory=list)      # traços (geográficos/anotação)
     text_rects: list = field(default_factory=list)         # caixas de texto
+    image_rects: list = field(default_factory=list)        # imagens embutidas (bbox pt)
+    field_rects: list = field(default_factory=list)        # imagens que dominam a página (campo climático)
     stats: dict = field(default_factory=dict)
 
 
 def collect_vector_layers(page: fitz.Page) -> VectorLayers:
-    """Classifica os desenhos vetoriais da página nas camadas da skill."""
+    """Classifica os desenhos vetoriais e imagens embutidas da página."""
     layers = VectorLayers()
     n_drawings = 0
     for d in page.get_drawings():
@@ -198,6 +201,28 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
         x0, y0, x1, y1 = w[:4]
         layers.text_rects.append((x0, y0, x1, y1))
 
+    # imagens embutidas: campo climático rasterizado dentro do PDF (ex.: mapas
+    # de gradiente interpolado exportados do matplotlib com rasterização)
+    page_area = page.rect.width * page.rect.height
+    for info in page.get_image_info():
+        bbox = info.get("bbox")
+        if not bbox:
+            continue
+        layers.image_rects.append(tuple(bbox))
+        area = max(bbox[2] - bbox[0], 0) * max(bbox[3] - bbox[1], 0)
+        if area > 0.08 * page_area:
+            layers.field_rects.append(tuple(bbox))
+
+    n_field_imgs = len(layers.field_rects)
+    if layers.zone_shapes and n_field_imgs == 0:
+        field_type = "vetorial (polígonos de zona)"
+    elif n_field_imgs and not layers.zone_shapes:
+        field_type = "imagem embutida (campo rasterizado)"
+    elif n_field_imgs and layers.zone_shapes:
+        field_type = "híbrido (vetorial + imagem)"
+    else:
+        field_type = "não identificado"
+
     layers.stats = {
         "drawings": n_drawings,
         "zone_fills": len(layers.zone_shapes),
@@ -205,6 +230,9 @@ def collect_vector_layers(page: fitz.Page) -> VectorLayers:
         "specks": len(layers.speck_shapes),
         "geo_lines": len(layers.stroke_shapes),
         "text_words": len(layers.text_rects),
+        "embedded_images": len(layers.image_rects),
+        "field_images": n_field_imgs,
+        "field_type": field_type,
     }
     return layers
 
@@ -237,6 +265,11 @@ def rasterize_masks(layers: VectorLayers, width_px: int, height_px: int, zoom: f
         p = to_px(pts)
         if len(p) >= 3:
             cv2.fillPoly(zone, [p], 255)
+    # campos climáticos embutidos como imagem no PDF também são região de zona
+    for (x0, y0, x1, y1) in layers.field_rects:
+        cv2.rectangle(zone,
+                      (int(math.floor(x0 * zoom)), int(math.floor(y0 * zoom))),
+                      (int(math.ceil(x1 * zoom)), int(math.ceil(y1 * zoom))), 255, -1)
     for pts, w in layers.stroke_shapes:
         p = to_px(pts)
         thick = max(1, int(round(w * zoom)) + 1)

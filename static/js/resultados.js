@@ -62,14 +62,18 @@
     /* ---------- original ---------- */
     $("orig-img").src = fileURL("original.png");
     const L = data.layers;
-    $("layers-kv").innerHTML = [
+    const kvRows = [
       ["Desenhos vetoriais", L.drawings],
       ["Preenchimentos de zona", L.zone_fills],
       ["Linhas geográficas", L.geo_lines],
       ["Pontos observacionais", L.obs_points],
       ["Specks de ruído detectados", L.specks],
       ["Palavras de texto", L.text_words],
-    ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    ];
+    if (L.embedded_images !== undefined) kvRows.push(["Imagens embutidas", L.embedded_images]);
+    kvRows.push(["Tipo de campo climático", L.field_type || "—"]);
+    $("layers-kv").innerHTML = kvRows
+      .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     $("orig-chips").innerHTML = `
       <span class="chip">Espaço de processamento: ${data.pipeline.espaco_cor}</span>
       <span class="chip">Faixa de refinamento: ±${data.pipeline.faixa_refinamento_px} px</span>
